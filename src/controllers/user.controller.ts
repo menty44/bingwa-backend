@@ -26,6 +26,8 @@ export class UserController {
     public usersRepository : UsersRepository,
   ) {}
 
+  // @ts-ignore
+  // @ts-ignore
   @post('/users')
   @response(200, {
     description: 'Users model instance',
@@ -36,14 +38,15 @@ export class UserController {
       content: {
         'application/json': {
           schema: getModelSchemaRef(Users, {
-            title: 'NewUsers',
-            exclude: ['id'],
+            title: 'NewUsers'
           }),
         },
       },
     })
     users: Omit<Users, 'id'>,
   ): Promise<Users> {
+    let checker = await this.checkUser(users.email);
+    console.log(checker);
     return this.usersRepository.create(users);
   }
 
@@ -105,7 +108,7 @@ export class UserController {
     },
   })
   async findById(
-    @param.path.number('id') id: number,
+    @param.path.string('id') id: string,
     @param.filter(Users, {exclude: 'where'}) filter?: FilterExcludingWhere<Users>
   ): Promise<Users> {
     return this.usersRepository.findById(id, filter);
@@ -116,7 +119,7 @@ export class UserController {
     description: 'Users PATCH success',
   })
   async updateById(
-    @param.path.number('id') id: number,
+    @param.path.string('id') id: string,
     @requestBody({
       content: {
         'application/json': {
@@ -134,7 +137,7 @@ export class UserController {
     description: 'Users PUT success',
   })
   async replaceById(
-    @param.path.number('id') id: number,
+    @param.path.string('id') id: string,
     @requestBody() users: Users,
   ): Promise<void> {
     await this.usersRepository.replaceById(id, users);
@@ -144,7 +147,16 @@ export class UserController {
   @response(204, {
     description: 'Users DELETE success',
   })
-  async deleteById(@param.path.number('id') id: number): Promise<void> {
+  async deleteById(@param.path.string('id') id: string): Promise<void> {
     await this.usersRepository.deleteById(id);
+  }
+
+  async checkUser(email: string): Promise<any> {
+    let a = await this.usersRepository.findOne({where: {email: email}});
+    console.log("################################################################");
+    console.log(email);
+    console.log(a);
+    console.log("########################## end of checkUser ######################################");
+    return a;
   }
 }

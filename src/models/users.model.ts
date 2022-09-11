@@ -4,6 +4,14 @@ import {Entity, model, property} from '@loopback/repository';
 export class Users extends Entity {
   @property({
     type: 'string',
+    required: false,
+    id: true,
+    generated: false,
+  })
+  id: string;
+
+  @property({
+    type: 'string',
     required: true,
   })
   first_name: string;
@@ -15,9 +23,10 @@ export class Users extends Entity {
 
   @property({
     type: 'string',
-    id: true,
+    id: false,
     generated: false,
     required: true,
+    'index': {'unique': true}
   })
   email: string;
 

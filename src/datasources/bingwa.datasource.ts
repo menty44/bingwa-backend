@@ -4,12 +4,12 @@ import {juggler} from '@loopback/repository';
 const config = {
   name: 'bingwa',
   connector: 'mongodb',
-  url: 'mongodb+srv://bingwa-root:bingwa1234@cluster0.vci6c.mongodb.net/test',
+  url: 'mongodb+srv://bingwa-root:bingwa1234@cluster0.vci6c.mongodb.net/bingwa',
   host: 'cluster0.vci6c.mongodb.net',
-  port: 27017,
-  user: 'bingwa-root',
-  password: 'bingwa1234',
-  database: 'bingwa',
+  port: 0,
+  user: '',
+  password: '',
+  database: '',
   useNewUrlParser: true
 };
 
