@@ -26,8 +26,6 @@ export class UserController {
     public usersRepository : UsersRepository,
   ) {}
 
-  // @ts-ignore
-  // @ts-ignore
   @post('/users')
   @response(200, {
     description: 'Users model instance',
@@ -44,10 +42,10 @@ export class UserController {
       },
     })
     users: Omit<Users, 'id'>,
-  ): Promise<Users> {
+  ): Promise<any> {
     let checker = await this.checkUser(users.email);
-    console.log(checker);
-    return this.usersRepository.create(users);
+    return (checker.email === users.email) ? {message: 'Email already in use'} : this.usersRepository.create(users);
+
   }
 
   @get('/users/count')
@@ -152,11 +150,7 @@ export class UserController {
   }
 
   async checkUser(email: string): Promise<any> {
-    let a = await this.usersRepository.findOne({where: {email: email}});
-    console.log("################################################################");
-    console.log(email);
-    console.log(a);
-    console.log("########################## end of checkUser ######################################");
-    return a;
+    let foundUser = await this.usersRepository.findOne({where: {email: email}});
+    return foundUser;
   }
 }
