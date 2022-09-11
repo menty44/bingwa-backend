@@ -19,9 +19,28 @@ import {
 } from '@loopback/rest';
 import {Users} from '../models';
 import {UsersRepository} from '../repositories';
+import {authenticate, TokenService} from "@loopback/authentication";
+import {inject} from "@loopback/core";
+import {SecurityBindings} from "@loopback/security";
+import {
+  TokenServiceBindings,
+  UserServiceBindings,
+  User,
+  Credentials,
+  MyUserService,
+  UserRepository,
+} from '@loopback/authentication-jwt';
+import {hash, genSalt} from 'bcryptjs';
+import _ from 'lodash';
 
 export class UserController {
   constructor(
+      @inject(TokenServiceBindings.TOKEN_SERVICE)
+      public jwtService: TokenService,
+      @inject(UserServiceBindings.USER_SERVICE)
+      public userService: MyUserService,
+      @inject(SecurityBindings.USER, {optional: true})
+      public user: Users,
     @repository(UsersRepository)
     public usersRepository : UsersRepository,
   ) {}
@@ -44,6 +63,7 @@ export class UserController {
     users: Omit<Users, 'id'>,
   ): Promise<any> {
     let checker = await this.checkUser(users.email);
+    const password = await hash(users.password, await genSalt());
     return (checker.email === users.email) ? {message: 'Email already in use'} : this.usersRepository.create(users);
 
   }
@@ -152,5 +172,64 @@ export class UserController {
   async checkUser(email: string): Promise<any> {
     let foundUser = await this.usersRepository.findOne({where: {email: email}});
     return foundUser;
+  }
+
+  @post('/signin', {
+    responses: {
+      '200': {
+        description: 'Token',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                token: {
+                  type: 'string',
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  async signIn(
+      @requestBody({
+        content: {
+          'application/json': {
+            schema: getModelSchemaRef(Users, {
+              title: 'Login'
+            }),
+          },
+        },
+      }) credentials: Users,
+  ): Promise<{ token: string }> {
+    const user = await this.userService.verifyCredentials(credentials);
+    const userProfile = this.userService.convertToUserProfile(user);
+    const token = await this.jwtService.generateToken(userProfile);
+    return { token };
+  }
+
+  @authenticate('jwt')
+  @get('/whoami', {
+    responses: {
+      '200': {
+        description: 'Return current user',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'string',
+            },
+          },
+        },
+      },
+    },
+  })
+  async whoAmI(
+      @inject(SecurityBindings.USER)
+          loggedInUserProfile: Users,
+  ): Promise<string> {
+    // @ts-ignore
+    return loggedInUserProfile[securityId];
   }
 }
