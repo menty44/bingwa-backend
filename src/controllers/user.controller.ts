@@ -18,7 +18,8 @@ import {
   response,
 } from '@loopback/rest';
 import {Users} from '../models';
-import {UsersRepository} from '../repositories';
+// @ts-ignore
+import {CredentialsRepository, UserRepository} from '../repositories';
 import {authenticate, TokenService} from "@loopback/authentication";
 import {inject} from "@loopback/core";
 import {SecurityBindings} from "@loopback/security";
@@ -28,22 +29,49 @@ import {
   User,
   Credentials,
   MyUserService,
-  UserRepository,
 } from '@loopback/authentication-jwt';
 import {hash, genSalt} from 'bcryptjs';
 import _ from 'lodash';
+// import { Credentials } from '../models/credentials.model';
+
+let  CredentialsSchema = {
+  type: 'object',
+  required: ['email', 'password'],
+  properties: {
+    email: {
+      type: 'string',
+      format: 'email',
+    },
+    password: {
+      type: 'string',
+      minLength: 5,
+    },
+  },
+};
+
+export const CredentialsRequestBody = {
+  description: 'The input of login function',
+  required: true,
+  content: {
+    'application/json': {schema: CredentialsSchema},
+  },
+};
 
 export class UserController {
   constructor(
-      @inject(TokenServiceBindings.TOKEN_SERVICE)
-      public jwtService: TokenService,
-      @inject(UserServiceBindings.USER_SERVICE)
-      public userService: MyUserService,
-      @inject(SecurityBindings.USER, {optional: true})
-      public user: Users,
-    @repository(UsersRepository)
-    public usersRepository : UsersRepository,
+    @inject(TokenServiceBindings.TOKEN_SERVICE)
+    public jwtService: TokenService,
+    @inject(UserServiceBindings.USER_SERVICE)
+    public userService: MyUserService,
+    @inject(SecurityBindings.USER, {optional: true})
+    public user: Users,
+    @repository(UserRepository)
+    public usersRepository : UserRepository,
+    @repository(CredentialsRepository)
+    public credRepository : CredentialsRepository,
   ) {}
+
+
 
   @post('/users')
   @response(200, {
@@ -64,13 +92,16 @@ export class UserController {
   ): Promise<any> {
     let checker = await this.checkUser(users.email);
     const password = await hash(users.password, await genSalt());
-    // return () ? {message: 'Email already in use'} : this.usersRepository.create(users);
 
-    if (checker.email === users.email) {
+    if (checker && checker.email === users.email) {
       return {message: 'Email already in use'};
     }else {
       users.password = password
-      return await this.usersRepository.create(users);
+      let us = await this.usersRepository.create(users);
+      // Credentials.id = us.id;
+      // Credentials.password = us.password;
+      await this.credRepository.create(us);
+      return us;
     }
   }
 
@@ -180,6 +211,7 @@ export class UserController {
     return foundUser;
   }
 
+  // @ts-ignore
   @post('/signin', {
     responses: {
       '200': {
@@ -203,16 +235,25 @@ export class UserController {
       @requestBody({
         content: {
           'application/json': {
-            schema: getModelSchemaRef(Users, {
-              title: 'Login'
-            }),
+            schema: getModelSchemaRef(Users, {partial: true}),
           },
         },
-      }) credentials: Users,
+      }) credentials: Credentials,
   ): Promise<{ token: string }> {
+    console.log(credentials)
+    console.table(credentials)
+
+    // ensure the user exists, and the password is correct
     const user = await this.userService.verifyCredentials(credentials);
+    console.log(user)
+    console.table(user)
+    // convert a User object into a UserProfile object (reduced set of properties)
     const userProfile = this.userService.convertToUserProfile(user);
+    console.log(userProfile)
+    // create a JSON Web Token based on the user profile
     const token = await this.jwtService.generateToken(userProfile);
+    console.log(token)
+
     return { token };
   }
 
@@ -239,3 +280,5 @@ export class UserController {
     return loggedInUserProfile[securityId];
   }
 }
+
+

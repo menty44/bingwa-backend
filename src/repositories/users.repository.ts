@@ -3,7 +3,7 @@ import {DefaultCrudRepository} from '@loopback/repository';
 import {BingwaDataSource} from '../datasources';
 import {Users, UsersRelations} from '../models';
 
-export class UsersRepository extends DefaultCrudRepository<
+export class UserRepository extends DefaultCrudRepository<
   Users,
   typeof Users.prototype.email,
   UsersRelations
