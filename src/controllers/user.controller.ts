@@ -64,8 +64,14 @@ export class UserController {
   ): Promise<any> {
     let checker = await this.checkUser(users.email);
     const password = await hash(users.password, await genSalt());
-    return (checker.email === users.email) ? {message: 'Email already in use'} : this.usersRepository.create(users);
+    // return () ? {message: 'Email already in use'} : this.usersRepository.create(users);
 
+    if (checker.email === users.email) {
+      return {message: 'Email already in use'};
+    }else {
+      users.password = password
+      return await this.usersRepository.create(users);
+    }
   }
 
   @get('/users/count')
