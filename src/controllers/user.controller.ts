@@ -1,39 +1,56 @@
+import {Count, CountSchema, Filter, FilterExcludingWhere, repository, Where,} from '@loopback/repository';
 import {
-  Count,
-  CountSchema,
-  Filter,
-  FilterExcludingWhere,
-  repository,
-  Where,
-} from '@loopback/repository';
-import {
-  post,
-  param,
+  del,
   get,
   getModelSchemaRef,
+  param,
   patch,
+  post,
   put,
-  del,
   requestBody,
   response,
+  SchemaObject,
 } from '@loopback/rest';
 import {Users} from '../models';
 // @ts-ignore
-import {CredentialsRepository, UserRepository} from '../repositories';
-import {authenticate, TokenService} from "@loopback/authentication";
+import {CredentialsRepository, UserCredRepository} from '../repositories';
 import {inject} from "@loopback/core";
-import {SecurityBindings} from "@loopback/security";
+import { authenticate, TokenService } from '@loopback/authentication';
 import {
-  TokenServiceBindings,
-  UserServiceBindings,
-  User,
   Credentials,
   MyUserService,
+  TokenServiceBindings,
+  User,
+  UserRepository,
+  UserServiceBindings,
 } from '@loopback/authentication-jwt';
-import {hash, genSalt} from 'bcryptjs';
-import _ from 'lodash';
-// import { Credentials } from '../models/credentials.model';
+import { SecurityBindings, securityId, UserProfile } from '@loopback/security';
+import { genSalt, hash } from 'bcryptjs';
 
+// Describes the type of grant object taken in by method "refresh"
+type RefreshGrant = {
+  refreshToken: string;
+};
+
+// Describes the schema of grant object
+const RefreshGrantSchema: SchemaObject = {
+  type: 'object',
+  required: ['refreshToken'],
+  properties: {
+    refreshToken: {
+      type: 'string',
+    },
+  },
+};
+
+// Describes the request body of grant object
+const RefreshGrantRequestBody = {
+  description: 'Reissuing Acess Token',
+  required: true,
+  content: {
+    'application/json': {schema: RefreshGrantSchema},
+  },
+};
 let  CredentialsSchema = {
   type: 'object',
   required: ['email', 'password'],
@@ -57,22 +74,41 @@ export const CredentialsRequestBody = {
   },
 };
 
+const UserSchema: SchemaObject = {
+  type: 'object',
+  required: ['email', 'password'],
+  properties: {
+    email: {
+      type: 'string',
+      format: 'email',
+    },
+    password: {
+      type: 'string',
+      minLength: 6,
+    },
+  },
+};
+
+export const RequestBody = {
+  description: 'The input of login function',
+  required: true,
+  content: {
+    'application/json': { schema: UserSchema },
+  },
+};
+
 export class UserController {
   constructor(
-    @inject(TokenServiceBindings.TOKEN_SERVICE)
-    public jwtService: TokenService,
-    @inject(UserServiceBindings.USER_SERVICE)
-    public userService: MyUserService,
-    @inject(SecurityBindings.USER, {optional: true})
-    public user: Users,
-    @repository(UserRepository)
-    public usersRepository : UserRepository,
-    @repository(CredentialsRepository)
-    public credRepository : CredentialsRepository,
+      @inject(TokenServiceBindings.TOKEN_SERVICE)
+      public jwtService: TokenService,
+      @inject(UserServiceBindings.USER_SERVICE)
+      public userService: MyUserService,
+      @inject(SecurityBindings.USER, { optional: true })
+      public user: UserProfile,
+      @repository(UserCredRepository) protected userCRepository: UserCredRepository,
+      @repository(CredentialsRepository) protected credRepository: CredentialsRepository,
   ) {}
-
-
-
+  
   @post('/users')
   @response(200, {
     description: 'Users model instance',
@@ -97,7 +133,7 @@ export class UserController {
       return {message: 'Email already in use'};
     }else {
       users.password = password
-      let us = await this.usersRepository.create(users);
+      let us = await this.userCRepository.create(users);
       // Credentials.id = us.id;
       // Credentials.password = us.password;
       await this.credRepository.create(us);
@@ -113,7 +149,7 @@ export class UserController {
   async count(
     @param.where(Users) where?: Where<Users>,
   ): Promise<Count> {
-    return this.usersRepository.count(where);
+    return this.userCRepository.count(where);
   }
 
   @get('/users')
@@ -130,8 +166,8 @@ export class UserController {
   })
   async find(
     @param.filter(Users) filter?: Filter<Users>,
-  ): Promise<Users[]> {
-    return this.usersRepository.find(filter);
+  ): Promise<any> {
+    return this.userCRepository.find(filter);
   }
 
   @patch('/users')
@@ -150,7 +186,7 @@ export class UserController {
     users: Users,
     @param.where(Users) where?: Where<Users>,
   ): Promise<Count> {
-    return this.usersRepository.updateAll(users, where);
+    return this.userCRepository.updateAll(users, where);
   }
 
   @get('/users/{id}')
@@ -165,8 +201,8 @@ export class UserController {
   async findById(
     @param.path.string('id') id: string,
     @param.filter(Users, {exclude: 'where'}) filter?: FilterExcludingWhere<Users>
-  ): Promise<Users> {
-    return this.usersRepository.findById(id, filter);
+  ): Promise<any> {
+    return this.userCRepository.findById(id, filter);
   }
 
   @patch('/users/{id}')
@@ -184,7 +220,7 @@ export class UserController {
     })
     users: Users,
   ): Promise<void> {
-    await this.usersRepository.updateById(id, users);
+    await this.userCRepository.updateById(id, users);
   }
 
   @put('/users/{id}')
@@ -195,7 +231,7 @@ export class UserController {
     @param.path.string('id') id: string,
     @requestBody() users: Users,
   ): Promise<void> {
-    await this.usersRepository.replaceById(id, users);
+    await this.userCRepository.replaceById(id, users);
   }
 
   @del('/users/{id}')
@@ -203,12 +239,11 @@ export class UserController {
     description: 'Users DELETE success',
   })
   async deleteById(@param.path.string('id') id: string): Promise<void> {
-    await this.usersRepository.deleteById(id);
+    await this.userCRepository.deleteById(id);
   }
 
   async checkUser(email: string): Promise<any> {
-    let foundUser = await this.usersRepository.findOne({where: {email: email}});
-    return foundUser;
+    return await this.userCRepository.findOne({where: {email: email}});
   }
 
   // @ts-ignore
@@ -232,17 +267,9 @@ export class UserController {
     },
   })
   async signIn(
-      @requestBody({
-        content: {
-          'application/json': {
-            schema: getModelSchemaRef(Users, {partial: true}),
-          },
-        },
-      }) credentials: Credentials,
+      @requestBody(RequestBody) credentials: Credentials,
   ): Promise<{ token: string }> {
     console.log(credentials)
-    console.table(credentials)
-
     // ensure the user exists, and the password is correct
     const user = await this.userService.verifyCredentials(credentials);
     console.log(user)
@@ -279,6 +306,35 @@ export class UserController {
     // @ts-ignore
     return loggedInUserProfile[securityId];
   }
+
+  // async refreshLogin(
+  //     @requestBody({
+  //       content: {
+  //         'application/json': {
+  //           schema: getModelSchemaRef(Users, {partial: true}),
+  //         },
+  //       },
+  //     }) credentials: Credentials,
+  // ): Promise<TokenObject> {
+  //   // ensure the user exists, and the password is correct
+  //   const user = await this.userService.verifyCredentials(credentials);
+  //   // convert a User object into a UserProfile object (reduced set of properties)
+  //   const userProfile: UserProfile = this.userService.convertToUserProfile(
+  //       user,
+  //   );
+  //   const accessToken = await this.jwtService.generateToken(userProfile);
+  //   const tokens = await this.refreshService.generateToken(
+  //       userProfile,
+  //       accessToken,
+  //   );
+  //   return tokens;
+  // }
+  //
+  // async refresh(
+  //     @requestBody(RefreshGrantRequestBody) refreshGrant: RefreshGrant,
+  // ): Promise<TokenObject> {
+  //   return this.refreshService.refreshToken(refreshGrant.refreshToken);
+  // }
 }
 
 
