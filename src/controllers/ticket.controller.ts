@@ -55,8 +55,6 @@ export class TicketController {
             ticket.naration = 'Ticket created by SELF'
             return this.ticketRepository.create(ticket);
         } else {
-
-
             if (ticket.act_as === ticket.created_by) {
                 return {message: 'Cannot impersonate SELF'}
             }
