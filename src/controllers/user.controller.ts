@@ -2,7 +2,7 @@ import {Count, CountSchema, Filter, FilterExcludingWhere, repository, Where,} fr
 import {
   del,
   get,
-  getModelSchemaRef,
+  getModelSchemaRef, HttpErrors,
   param,
   patch,
   post,
@@ -11,13 +11,13 @@ import {
   response,
   SchemaObject,
 } from '@loopback/rest';
-import {Users} from '../models';
+import {Users, UsersRelations} from '../models';
 // @ts-ignore
 import {CredentialsRepository, UserCredRepository} from '../repositories';
 import {inject} from "@loopback/core";
 import { authenticate, TokenService } from '@loopback/authentication';
 import {
-  Credentials,
+  // Credentials,
   MyUserService,
   TokenServiceBindings,
   User,
@@ -26,10 +26,15 @@ import {
 } from '@loopback/authentication-jwt';
 import { SecurityBindings, securityId, UserProfile } from '@loopback/security';
 import { genSalt, hash } from 'bcryptjs';
-
+import {compare} from 'bcryptjs';
 // Describes the type of grant object taken in by method "refresh"
 type RefreshGrant = {
   refreshToken: string;
+};
+
+export type Credentials = {
+  email: string;
+  password: string;
 };
 
 // Describes the schema of grant object
@@ -271,10 +276,11 @@ export class UserController {
   ): Promise<{ token: string }> {
     console.log(credentials)
     // ensure the user exists, and the password is correct
-    const user = await this.userService.verifyCredentials(credentials);
+    const user = await this.verifyCredentials(credentials);
     console.log(user)
     console.table(user)
     // convert a User object into a UserProfile object (reduced set of properties)
+    // @ts-ignore
     const userProfile = this.userService.convertToUserProfile(user);
     console.log(userProfile)
     // create a JSON Web Token based on the user profile
@@ -282,6 +288,29 @@ export class UserController {
     console.log(token)
 
     return { token };
+  }
+
+  async verifyCredentials(credentials: Credentials): Promise<Users> {
+    const invalidCredentialsError = 'Invalid email or password.';
+
+    const foundUser = await this.userCRepository.findOne({
+      where: {email: credentials.email},
+    });
+    console.error(foundUser);
+    if (!foundUser) {
+      throw new HttpErrors.Unauthorized(invalidCredentialsError);
+    }
+
+    const passwordMatched = await compare(
+        credentials.password,
+        foundUser.password,
+    );
+
+    if (!passwordMatched) {
+      throw new HttpErrors.Unauthorized(invalidCredentialsError);
+    }
+
+    return foundUser;
   }
 
   @authenticate('jwt')
@@ -307,34 +336,6 @@ export class UserController {
     return loggedInUserProfile[securityId];
   }
 
-  // async refreshLogin(
-  //     @requestBody({
-  //       content: {
-  //         'application/json': {
-  //           schema: getModelSchemaRef(Users, {partial: true}),
-  //         },
-  //       },
-  //     }) credentials: Credentials,
-  // ): Promise<TokenObject> {
-  //   // ensure the user exists, and the password is correct
-  //   const user = await this.userService.verifyCredentials(credentials);
-  //   // convert a User object into a UserProfile object (reduced set of properties)
-  //   const userProfile: UserProfile = this.userService.convertToUserProfile(
-  //       user,
-  //   );
-  //   const accessToken = await this.jwtService.generateToken(userProfile);
-  //   const tokens = await this.refreshService.generateToken(
-  //       userProfile,
-  //       accessToken,
-  //   );
-  //   return tokens;
-  // }
-  //
-  // async refresh(
-  //     @requestBody(RefreshGrantRequestBody) refreshGrant: RefreshGrant,
-  // ): Promise<TokenObject> {
-  //   return this.refreshService.refreshToken(refreshGrant.refreshToken);
-  // }
 }
 
 
