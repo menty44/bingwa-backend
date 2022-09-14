@@ -18,12 +18,17 @@ import {
   response,
 } from '@loopback/rest';
 import {Ticket} from '../models';
-import {TicketRepository} from '../repositories';
+import {TicketRepository, UserCredRepository} from '../repositories';
+import {CommonService} from "../services";
+import {service} from "@loopback/core";
+
 
 export class TicketController {
   constructor(
     @repository(TicketRepository)
     public ticketRepository : TicketRepository,
+    @repository(UserCredRepository) protected userCRepository: UserCredRepository,
+    @service(CommonService) protected commonService: CommonService,
   ) {}
 
   @post('/tickets')
@@ -43,8 +48,25 @@ export class TicketController {
       },
     })
     ticket: Omit<Ticket, 'id'>,
-  ): Promise<Ticket> {
-    return this.ticketRepository.create(ticket);
+  ): Promise<any> {
+
+    if (!ticket.impersonate) {
+      ticket.naration = 'Ticket created by self'
+      return this.ticketRepository.create(ticket);
+    }else{
+      let foundUser = await this.checkUserIfExists(ticket.act_as)
+
+      if (foundUser) {
+        ticket.naration = `Created by John on behalf of ${foundUser.first_name} ${foundUser.last_name}`
+        return this.ticketRepository.create(ticket);
+      }else{
+      }
+    }
+
+  }
+
+  async checkUserIfExists(email: string | undefined): Promise<any> {
+    return this.commonService.checkUser(email);
   }
 
   @get('/tickets/count')
@@ -105,7 +127,7 @@ export class TicketController {
     },
   })
   async findById(
-    @param.path.object('id') id: object,
+    @param.path.string('id') id: string,
     @param.filter(Ticket, {exclude: 'where'}) filter?: FilterExcludingWhere<Ticket>
   ): Promise<Ticket> {
     return this.ticketRepository.findById(id, filter);
@@ -116,7 +138,7 @@ export class TicketController {
     description: 'Ticket PATCH success',
   })
   async updateById(
-    @param.path.object('id') id: object,
+    @param.path.string('id') id: string,
     @requestBody({
       content: {
         'application/json': {
@@ -134,7 +156,7 @@ export class TicketController {
     description: 'Ticket PUT success',
   })
   async replaceById(
-    @param.path.object('id') id: object,
+    @param.path.string('id') id: string,
     @requestBody() ticket: Ticket,
   ): Promise<void> {
     await this.ticketRepository.replaceById(id, ticket);
@@ -144,7 +166,7 @@ export class TicketController {
   @response(204, {
     description: 'Ticket DELETE success',
   })
-  async deleteById(@param.path.object('id') id: object): Promise<void> {
+  async deleteById(@param.path.string('id') id: string): Promise<void> {
     await this.ticketRepository.deleteById(id);
   }
 }
