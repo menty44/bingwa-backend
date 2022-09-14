@@ -61,15 +61,15 @@ export class TicketController {
                 return {message: 'Cannot impersonate SELF'}
             }
             let us = await this.commonService.findTempUserByID(ticket.act_as),
-                foundUser = await this.checkUserIfExists(us.email)
+                foundUser = await this.checkUserIfExists(us.email),
+                selfUser = await this.commonService.findTempUserByID(ticket.created_by)
             if (foundUser) {
-                ticket.naration = `Created by John on behalf of ${foundUser.first_name.toUpperCase()} ${foundUser.last_name.toUpperCase()}`
+                ticket.naration = `Created by ${selfUser.first_name.toUpperCase()} ${selfUser.last_name.toUpperCase()} on behalf of ${foundUser.first_name.toUpperCase()} ${foundUser.last_name.toUpperCase()}`
                 return this.ticketRepository.create(ticket);
             } else {
                 return this.ticketRepository.create(ticket);
             }
         }
-
     }
 
     async checkUserIfExists(email: string | undefined): Promise<any> {
