@@ -1,6 +1,9 @@
 import {injectable, /* inject, */ BindingScope} from '@loopback/core';
 import {TicketRepository, UserCredRepository} from '../repositories';
-import {repository} from "@loopback/repository";
+import {Users} from "../models";
+
+import {Count, CountSchema, Filter, FilterExcludingWhere, repository, Where,} from '@loopback/repository';
+
 
 @injectable({scope: BindingScope.TRANSIENT})
 export class CommonService {
@@ -15,5 +18,10 @@ export class CommonService {
 
   async checkUser(email: string | undefined): Promise<any> {
     return await this.userCRepository.findOne({where: {email: email}});
+  }
+
+  async findTempUserByID(id: string | undefined): Promise<any> {
+    // @ts-ignore
+    return this.userCRepository.findById(id, Users);
   }
 }
