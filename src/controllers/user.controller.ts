@@ -273,7 +273,7 @@ export class UserController {
   })
   async signIn(
       @requestBody(RequestBody) credentials: Credentials,
-  ): Promise<{ token: string }> {
+  ): Promise<any> {
     console.log(credentials)
     // ensure the user exists, and the password is correct
     const user = await this.verifyCredentials(credentials);
@@ -287,7 +287,10 @@ export class UserController {
     const token = await this.jwtService.generateToken(userProfile);
     console.log(token)
 
-    return { token };
+    return {
+      token: token,
+      user: user
+    }
   }
 
   async verifyCredentials(credentials: Credentials): Promise<Users> {
