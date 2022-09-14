@@ -17,16 +17,13 @@ import {CredentialsRepository, UserCredRepository} from '../repositories';
 import {inject} from "@loopback/core";
 import { authenticate, TokenService } from '@loopback/authentication';
 import {
-  // Credentials,
   MyUserService,
   TokenServiceBindings,
-  User,
-  UserRepository,
   UserServiceBindings,
 } from '@loopback/authentication-jwt';
 import { SecurityBindings, securityId, UserProfile } from '@loopback/security';
-import { genSalt, hash } from 'bcryptjs';
-import {compare} from 'bcryptjs';
+import { compare, genSalt, hash } from 'bcryptjs';
+
 // Describes the type of grant object taken in by method "refresh"
 type RefreshGrant = {
   refreshToken: string;
@@ -139,8 +136,6 @@ export class UserController {
     }else {
       users.password = password
       let us = await this.userCRepository.create(users);
-      // Credentials.id = us.id;
-      // Credentials.password = us.password;
       await this.credRepository.create(us);
       return us;
     }
@@ -277,15 +272,13 @@ export class UserController {
     console.log(credentials)
     // ensure the user exists, and the password is correct
     const user = await this.verifyCredentials(credentials);
-    console.log(user)
     console.table(user)
     // convert a User object into a UserProfile object (reduced set of properties)
     // @ts-ignore
     const userProfile = this.userService.convertToUserProfile(user);
-    console.log(userProfile)
+    console.table(userProfile)
     // create a JSON Web Token based on the user profile
     const token = await this.jwtService.generateToken(userProfile);
-    console.log(token)
 
     return {
       token: token,
